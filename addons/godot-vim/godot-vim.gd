@@ -254,14 +254,16 @@ class Command:
             if one_line:
                 col = ed.last_column(line) + 1
             else:
-                line += 1
+                if ed.last_line() !=line:
+                    line += 1
                 col = 0
         elif col < 0:
             if one_line:
                 col = 0
             else:
-                line -= 1
-                col = ed.last_column(line)
+                if line !=0:
+                    line -= 1
+                    col = ed.last_column(line)
         return Position.new(line, col)
 
     static func move_by_scroll(cur: Position, args: Dictionary, ed: EditorAdaptor, vim: Vim) -> Position:
@@ -998,6 +1000,7 @@ class VimSession:
 
     ## The start position of visual mode
     var visual_start_pos := Position.zero
+    var visual_current_pos := Position.zero
 
     func enter_normal_mode() -> void:
         if insert_mode:
@@ -1022,6 +1025,7 @@ class VimSession:
         ed.set_block_caret(true)
 
         visual_start_pos = ed.curr_position()
+        visual_current_pos = ed.curr_position()
         if line_wise:
             ed.select(visual_start_pos.line, 0, visual_start_pos.line + 1, 0)
         else:
@@ -1125,6 +1129,10 @@ class Vim:
 
     func remove_session(s: Script):
         sessions.erase(s)
+
+    func is_in_visual_mode() -> bool:
+        return current.visual_mode
+
 
 
 class CharIterator:
@@ -1528,6 +1536,7 @@ class CommandDispatcher:
                 return true
 
             if vim_session.visual_mode:  # Visual mode
+                vim_session.visual_current_pos =new_pos
                 start = vim_session.visual_start_pos
                 if new_pos is TextRange:
                     start = new_pos.from # In some cases (text object), we need to override the start position
@@ -1595,7 +1604,7 @@ class CommandDispatcher:
 
     func process_motion(motion: String, motion_args: Dictionary, ed: EditorAdaptor, vim: Vim) -> Variant:
         # Get current position
-        var cur := Position.new(ed.curr_line(), ed.curr_column())
+        var cur := Position.new(ed.curr_line(), ed.curr_column()) if not vim.is_in_visual_mode() else vim.current.visual_current_pos
 
         # Prepare motion args
         var user_repeat = vim.current.input_state.get_repeat()
